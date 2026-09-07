@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SA Municipal Financial Health — Dashboard</title>
+<meta name="description" content="Interactive financial-health scorecard for 246 South African municipalities, built from the National Treasury Municipal Money API."/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  :root{
+    --navy:#0d1b2a; --navy-mid:#1a2e45; --card:#152333;
+    --accent:#c8a96e; --white:#f5f7fa; --text:#d0d9e4; --dim:#8a9bae;
+    --border:rgba(200,169,110,0.18);
+    --good:#1baf7a; --bad:#e34948; --warn:#eda100;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--navy);color:var(--text);line-height:1.6}
+  a{color:var(--accent)}
+
+  header{padding:1.6rem 2rem 1.2rem;border-bottom:1px solid var(--border);
+         display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end;justify-content:space-between}
+  h1{font-family:'Playfair Display',serif;font-size:1.7rem;color:var(--white);font-weight:700}
+  .sub{font-size:.85rem;color:var(--dim);margin-top:.25rem}
+  .back{font-size:.8rem;text-decoration:none;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+
+  main{padding:1.6rem 2rem 3rem;max-width:1500px;margin:0 auto}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.4rem}
+  .kpi{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:1rem 1.2rem}
+  .kpi-num{font-family:'Playfair Display',serif;font-size:1.7rem;color:var(--accent);font-weight:700;line-height:1.15}
+  .kpi-lab{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-top:.3rem}
+
+  .controls{display:flex;flex-wrap:wrap;gap:1.2rem;align-items:flex-end;
+            background:var(--card);border:1px solid var(--border);border-radius:4px;
+            padding:1rem 1.2rem;margin-bottom:1.4rem}
+  .ctrl{display:flex;flex-direction:column;gap:.35rem}
+  .ctrl label{font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:600}
+  select,input[type=search]{background:var(--navy-mid);color:var(--text);border:1px solid var(--border);
+    border-radius:3px;padding:.45rem .7rem;font-family:'DM Sans',sans-serif;font-size:.85rem;min-width:165px}
+  select:focus,input:focus{outline:1px solid var(--accent)}
+  .reset{background:transparent;border:1px solid var(--border);color:var(--dim);border-radius:20px;
+         padding:.45rem 1rem;font-family:'DM Sans',sans-serif;font-size:.78rem;cursor:pointer;transition:.2s}
+  .reset:hover{color:var(--accent);border-color:var(--accent)}
+  .matchline{font-size:.78rem;color:var(--dim);margin-left:auto}
+  .matchline b{color:var(--accent)}
+
+  .grid{display:grid;grid-template-columns:1.25fr 1fr;gap:1.2rem;align-items:start;margin-bottom:1.2rem}
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:1.1rem 1.2rem}
+  .panel h2{font-family:'Playfair Display',serif;font-size:1rem;color:var(--white);margin-bottom:.15rem}
+  .panel .note{font-size:.75rem;color:var(--dim);margin-bottom:.9rem}
+
+  svg{display:block;width:100%;height:auto;overflow:visible}
+  .ax{stroke:rgba(255,255,255,.14);stroke-width:1}
+  .gridline{stroke:rgba(255,255,255,.06);stroke-width:1}
+  .axtext{fill:#8a9bae;font-size:10px;font-family:'DM Sans',sans-serif}
+  .reftext{fill:#8a9bae;font-size:9.5px;font-family:'DM Sans',sans-serif}
+  .dot{cursor:pointer}
+  .dot:hover{stroke:#fff;stroke-width:1.5}
+
+  .legend{display:flex;flex-wrap:wrap;gap:.9rem;margin-top:.6rem;font-size:.72rem;color:var(--dim)}
+  .legend span.sw{width:11px;height:11px;border-radius:50%;display:inline-block;margin-right:.35rem;vertical-align:-1px}
+
+  table{width:100%;border-collapse:collapse;font-size:.8rem}
+  th,td{text-align:left;padding:.4rem .35rem;border-bottom:1px solid rgba(255,255,255,.06);white-space:nowrap}
+  th{font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);font-weight:600;
+     cursor:pointer;user-select:none;position:sticky;top:0;background:var(--card)}
+  th:hover{color:var(--accent)}
+  th.sorted::after{content:" ▾";color:var(--accent)}
+  th.sorted.asc::after{content:" ▴"}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tbody tr:hover{background:rgba(200,169,110,.07)}
+  .scroll{max-height:430px;overflow-y:auto}
+
+  #tip{position:fixed;pointer-events:none;background:#0b1622;border:1px solid var(--border);
+       border-radius:4px;padding:.55rem .7rem;font-size:.78rem;opacity:0;transition:opacity .12s;
+       z-index:50;box-shadow:0 10px 30px rgba(0,0,0,.55);max-width:250px}
+  #tip b{color:var(--accent)}
+  #tip .r{color:var(--dim)}
+
+  footer{padding:1.4rem 2rem 2.5rem;font-size:.78rem;color:var(--dim);max-width:1500px;margin:0 auto}
+  footer a{text-decoration:none}
+
+  @media(max-width:1050px){.grid{grid-template-columns:1fr}}
+  @media(max-width:640px){header,main,footer{padding-left:1rem;padding-right:1rem}.matchline{margin-left:0}}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>South African Municipal Financial Health</h1>
+    <div class="sub" id="subtitle">Loading…</div>
+  </div>
+  <a class="back" href="../../#projects">← Back to portfolio</a>
+</header>
+
+<main>
+  <div class="kpis" id="kpis"></div>
+
+  <div class="controls">
+    <div class="ctrl"><label for="f-prov">Province</label>
+      <select id="f-prov"><option value="">All provinces</option></select></div>
+    <div class="ctrl"><label for="f-audit">Audit outcome</label>
+      <select id="f-audit"><option value="">All outcomes</option></select></div>
+    <div class="ctrl"><label for="f-cat">Category</label>
+      <select id="f-cat"><option value="">All categories</option></select></div>
+    <div class="ctrl"><label for="f-search">Find a municipality</label>
+      <input id="f-search" type="search" placeholder="e.g. Buffalo City" autocomplete="off"/></div>
+    <button class="reset" id="reset" type="button">Reset</button>
+    <div class="matchline" id="matchline"></div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Cash coverage against irregular spending</h2>
+      <div class="note">Every municipality is one dot. Healthy sits bottom-right — cash above Treasury's one-month floor, UIFW near zero. Hover any dot.</div>
+      <svg id="scatter" viewBox="0 0 520 380" role="img" aria-label="Cash coverage versus UIFW"></svg>
+      <div class="legend" id="scatter-legend"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Municipalities</h2>
+      <div class="note">Click a column to sort. Score is 0 (worst) to 100 (best).</div>
+      <div class="scroll">
+        <table id="tbl">
+          <thead><tr>
+            <th data-k="name">Municipality</th>
+            <th data-k="cash" class="num">Cash</th>
+            <th data-k="uifw" class="num">UIFW</th>
+            <th data-k="margin" class="num">Margin</th>
+            <th data-k="score" class="num">Score</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Median health score by province</h2>
+      <div class="note">Under the current filters. Provinces with no matching municipality are omitted.</div>
+      <svg id="provchart" viewBox="0 0 520 300" role="img" aria-label="Median health score by province"></svg>
+    </div>
+    <div class="panel">
+      <h2>Audit outcomes, 2015–2024</h2>
+      <div class="note">Share of all municipalities each year. Lighter is a better opinion. Not affected by the filters above.</div>
+      <svg id="trend" viewBox="0 0 520 300" role="img" aria-label="Audit outcomes over time"></svg>
+      <div class="legend" id="trend-legend"></div>
+    </div>
+  </div>
+</main>
+
+<div id="tip"></div>
+
+<footer>
+  Data: <a href="https://municipaldata.treasury.gov.za/" target="_blank" rel="noopener">National Treasury Municipal Money API</a>,
+  audited actuals FY2024 · Analysis by
+  <a href="https://github.com/Siya990808/sa-municipal-financial-health" target="_blank" rel="noopener">Siyabonga Mfusi</a> ·
+  Reported data: municipalities whose controls have collapsed are also least able to file accurately, so the worst cases are likely understated.
+</footer>
+
+<script>
+// Audit outcome is ordinal, so it gets a single-hue ramp, light (good) to dark (bad) --
+// the same encoding this variable has in the notebook's figures.
+const ORDINAL = ["#86b6ef","#5598e7","#2a78d6","#1c5cab","#104281","#0d366b"];
+const MUTED = "#5b6675";
+const INK_DIM = "#8a9bae";
+
+let DATA, COLOUR = {};
+const F = {prov:"", audit:"", cat:"", q:""};
+let SORT = {k:"score", asc:true};
+
+const $ = id => document.getElementById(id);
+const tip = $("tip");
+
+const median = a => { if(!a.length) return null; const s=[...a].sort((x,y)=>x-y); const m=s.length>>1;
+  return s.length%2 ? s[m] : (s[m-1]+s[m])/2; };
+const fmt = (v,d=1) => v==null ? "—" : v.toFixed(d);
+
+function showTip(html, ev){
+  tip.innerHTML = html; tip.style.opacity = 1;
+  const pad = 14;
+  let x = ev.clientX + pad, y = ev.clientY + pad;
+  const r = tip.getBoundingClientRect();
+  if(x + r.width > innerWidth - 8) x = ev.clientX - r.width - pad;
+  if(y + r.height > innerHeight - 8) y = ev.clientY - r.height - pad;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+const hideTip = () => tip.style.opacity = 0;
+
+/* ---------- filtering ---------- */
+
+function rows(){
+  const q = F.q.trim().toLowerCase();
+  return DATA.municipalities.filter(m =>
+       (!F.prov  || m.prov  === F.prov)
+    && (!F.audit || m.audit === F.audit)
+    && (!F.cat   || m.cat   === F.cat)
+    && (!q || m.name.toLowerCase().includes(q)));
+}
+
+/* ---------- KPIs ---------- */
+
+function renderKpis(rs){
+  const cash = rs.map(m=>m.cash).filter(v=>v!=null);
+  const uifw = rs.map(m=>m.uifw).filter(v=>v!=null);
+  const below = cash.filter(v=>v<1).length;
+  const clean = rs.filter(m=>m.audit==="Unqualified - No findings").length;
+  const graded = rs.filter(m=>m.audit).length;
+
+  const items = [
+    [rs.length.toLocaleString(), "Municipalities"],
+    [cash.length ? fmt(median(cash),1) : "—", "Median months of cash"],
+    [uifw.length ? fmt(median(uifw),1)+"%" : "—", "Median UIFW / spend"],
+    [cash.length ? below+" of "+cash.length : "—", "Below the 1-month floor"],
+    [graded ? (clean/graded*100).toFixed(0)+"%" : "—", "Clean audits"],
+  ];
+  $("kpis").innerHTML = items.map(([v,l]) =>
+    `<div class="kpi"><div class="kpi-num">${v}</div><div class="kpi-lab">${l}</div></div>`).join("");
+
+  $("matchline").innerHTML =
+    `<b>${rs.length}</b> of ${DATA.municipalities.length} municipalities match`;
+}
+
+/* ---------- scatter ---------- */
+
+const CLIP = {x:[-8,30], y:[0,80]};
+
+function renderScatter(rs){
+  const W=520,H=380,P={l:46,r:14,t:12,b:44};
+  const x = v => P.l + (Math.min(Math.max(v,CLIP.x[0]),CLIP.x[1])-CLIP.x[0])/(CLIP.x[1]-CLIP.x[0])*(W-P.l-P.r);
+  const y = v => H-P.b - (Math.min(Math.max(v,CLIP.y[0]),CLIP.y[1])-CLIP.y[0])/(CLIP.y[1]-CLIP.y[0])*(H-P.t-P.b);
+
+  let g = "";
+  for(let v=0; v<=80; v+=20) g += `<line class="gridline" x1="${P.l}" y1="${y(v)}" x2="${W-P.r}" y2="${y(v)}"/>
+      <text class="axtext" x="${P.l-6}" y="${y(v)+3}" text-anchor="end">${v}%</text>`;
+  for(let v=-5; v<=30; v+=5) g += `<text class="axtext" x="${x(v)}" y="${H-P.b+14}" text-anchor="middle">${v}</text>`;
+
+  // Reference lines: Treasury's cash floor and a 10%-of-spend UIFW marker
+  g += `<line x1="${x(1)}" y1="${P.t}" x2="${x(1)}" y2="${H-P.b}" stroke="#e34948" stroke-width="1.4" stroke-dasharray="4 4"/>
+        <text class="reftext" x="${x(1)+4}" y="${P.t+11}" fill="#e34948">1-month floor</text>
+        <line x1="${P.l}" y1="${y(10)}" x2="${W-P.r}" y2="${y(10)}" stroke="#1baf7a" stroke-width="1.2" stroke-dasharray="4 4"/>
+        <text class="reftext" x="${W-P.r-4}" y="${y(10)-5}" text-anchor="end" fill="#1baf7a">UIFW 10% of spend</text>`;
+
+  g += `<line class="ax" x1="${P.l}" y1="${H-P.b}" x2="${W-P.r}" y2="${H-P.b}"/>
+        <line class="ax" x1="${P.l}" y1="${P.t}" x2="${P.l}" y2="${H-P.b}"/>
+        <text class="axtext" x="${(W-P.r+P.l)/2}" y="${H-8}" text-anchor="middle">Months of cash (clipped to ${CLIP.x[0]}–${CLIP.x[1]})</text>
+        <text class="axtext" transform="rotate(-90 12 ${(H-P.b+P.t)/2})" x="12" y="${(H-P.b+P.t)/2}" text-anchor="middle">UIFW as % of expenditure</text>`;
+
+  const pts = rs.filter(m => m.cash != null && m.uifw != null);
+  g += pts.map((m,i) =>
+    `<circle class="dot" data-i="${i}" cx="${x(m.cash).toFixed(1)}" cy="${y(m.uifw).toFixed(1)}" r="4"
+       fill="${COLOUR[m.audit] || MUTED}" fill-opacity=".82"/>`).join("");
+
+  $("scatter").innerHTML = g;
+
+  const svg = $("scatter");
+  svg.querySelectorAll(".dot").forEach(el => {
+    const m = pts[+el.dataset.i];
+    el.addEventListener("mousemove", ev => showTip(
+      `<b>${m.name}</b><br><span class="r">${m.prov} · ${m.cat}</span><br>
+       Cash: ${fmt(m.cash,1)} months<br>UIFW: ${fmt(m.uifw,1)}% of spend<br>
+       Margin: ${fmt(m.margin,1)}%<br>Score: ${fmt(m.score,0)}<br>
+       <span class="r">${m.audit || "no opinion"}</span>`, ev));
+    el.addEventListener("mouseleave", hideTip);
+  });
+
+  $("scatter-legend").innerHTML = DATA.auditOrder
+    .filter(o => pts.some(m => m.audit === o))
+    .map(o => `<span><span class="sw" style="background:${COLOUR[o]}"></span>${DATA.shortLabels[o]}</span>`)
+    .join("") + `<span><span class="sw" style="background:${MUTED}"></span>no opinion</span>`;
+}
+
+/* ---------- table ---------- */
+
+function renderTable(rs){
+  const dir = SORT.asc ? 1 : -1;
+  const sorted = [...rs].sort((a,b) => {
+    const A=a[SORT.k], B=b[SORT.k];
+    if(A==null) return 1; if(B==null) return -1;
+    return typeof A === "string" ? A.localeCompare(B)*dir : (A-B)*dir;
+  });
+
+  $("tbl").querySelector("tbody").innerHTML = sorted.length ? sorted.map(m=>`
+    <tr><td title="${m.prov} · ${m.cat}">${m.name}</td>
+    <td class="num" style="color:${m.cash==null?INK_DIM:(m.cash<1?"#e34948":m.cash<3?"#eda100":"#1baf7a")}">${fmt(m.cash,1)}</td>
+    <td class="num">${fmt(m.uifw,1)}</td>
+    <td class="num">${fmt(m.margin,1)}</td>
+    <td class="num"><b>${fmt(m.score,0)}</b></td></tr>`).join("")
+    : `<tr><td colspan="5" style="color:${INK_DIM}">No municipality matches.</td></tr>`;
+
+  document.querySelectorAll("#tbl th").forEach(th=>{
+    th.classList.toggle("sorted", th.dataset.k === SORT.k);
+    th.classList.toggle("asc", th.dataset.k === SORT.k && SORT.asc);
+  });
+}
+
+/* ---------- province chart ---------- */
+
+function renderProvinces(rs){
+  const by = new Map();
+  rs.forEach(m => { if(m.score==null) return;
+    if(!by.has(m.prov)) by.set(m.prov, []); by.get(m.prov).push(m.score); });
+
+  const data = [...by.entries()].map(([p,v]) => ({prov:p, med:median(v), n:v.length}))
+                                .sort((a,b) => a.med - b.med);
+
+  const W=520,H=300,P={l:118,r:52,t:8,b:28};
+  if(!data.length){ $("provchart").innerHTML =
+      `<text class="axtext" x="${W/2}" y="${H/2}" text-anchor="middle">No data under these filters</text>`; return; }
+
+  const bh = (H-P.t-P.b)/data.length;
+  const x = v => P.l + v/100*(W-P.l-P.r);
+  let g = `<line class="ax" x1="${P.l}" y1="${H-P.b}" x2="${W-P.r}" y2="${H-P.b}"/>`;
+  for(let v=0; v<=100; v+=25)
+    g += `<line class="gridline" x1="${x(v)}" y1="${P.t}" x2="${x(v)}" y2="${H-P.b}"/>
+          <text class="axtext" x="${x(v)}" y="${H-P.b+14}" text-anchor="middle">${v}</text>`;
+
+  data.forEach((d,i)=>{
+    const yb = P.t + i*bh + 2;
+    const col = d.med < 45 ? "#e34948" : d.med < 60 ? "#eda100" : "#1baf7a";
+    g += `<rect x="${P.l}" y="${yb}" width="${Math.max(0,x(d.med)-P.l)}" height="${bh-5}" fill="${col}" rx="1"/>
+          <text class="axtext" x="${P.l-7}" y="${yb+bh/2-1}" text-anchor="end">${d.prov}</text>
+          <text class="axtext" x="${x(d.med)+5}" y="${yb+bh/2-1}">${d.med.toFixed(0)} <tspan fill="#5b6675">(${d.n})</tspan></text>`;
+  });
+  $("provchart").innerHTML = g;
+}
+
+/* ---------- audit trend ---------- */
+
+function renderTrend(){
+  const T = DATA.trend, keys = DATA.auditOrder.map(o => DATA.shortLabels[o]);
+  const W=520,H=300,P={l:34,r:10,t:10,b:34};
+  const bw = (W-P.l-P.r)/T.length;
+  let g = "";
+
+  T.forEach((row,i)=>{
+    const total = keys.reduce((s,k)=>s+(row[k]||0),0) || 1;
+    let acc = 0;
+    keys.forEach((k,ki)=>{
+      const share = (row[k]||0)/total*100;
+      if(!share) return;
+      const h = share/100*(H-P.t-P.b);
+      const yb = H-P.b - (acc/100*(H-P.t-P.b)) - h;
+      g += `<rect x="${P.l+i*bw+3}" y="${yb}" width="${bw-6}" height="${h}" fill="${ORDINAL[ki]}"
+              stroke="#152333" stroke-width="1"><title>${row.year} · ${k}: ${row[k]} (${share.toFixed(1)}%)</title></rect>`;
+      acc += share;
+    });
+    g += `<text class="axtext" x="${P.l+i*bw+bw/2}" y="${H-P.b+14}" text-anchor="middle">${String(row.year).slice(2)}</text>`;
+  });
+  for(let v=0; v<=100; v+=25)
+    g += `<text class="axtext" x="${P.l-6}" y="${H-P.b-(v/100*(H-P.t-P.b))+3}" text-anchor="end">${v}%</text>`;
+
+  $("trend").innerHTML = g;
+  $("trend-legend").innerHTML = keys.map((k,i) =>
+    `<span><span class="sw" style="background:${ORDINAL[i]};border-radius:2px"></span>${k}</span>`).join("");
+}
+
+/* ---------- wiring ---------- */
+
+function refresh(){
+  const rs = rows();
+  renderKpis(rs); renderScatter(rs); renderTable(rs); renderProvinces(rs);
+}
+
+fetch("data.json").then(r=>r.json()).then(d=>{
+  DATA = d;
+  d.auditOrder.forEach((o,i) => COLOUR[o] = ORDINAL[i]);
+
+  $("subtitle").textContent =
+    `${d.totals.municipalities} municipalities · FY${d.year} audited actuals · `
+    + `${d.totals.clean_audits} of ${d.totals.audited} earned a clean audit · `
+    + `R${d.totals.uifw_total_bn}bn UIFW reported`;
+
+  const add = (id, values) => { const el=$(id);
+    [...new Set(values)].filter(Boolean).sort().forEach(v=>{
+      const o=document.createElement("option"); o.value=v;
+      o.textContent = id==="f-audit" ? (d.shortLabels[v]||v) : v; el.appendChild(o); }); };
+
+  add("f-prov",  d.municipalities.map(m=>m.prov));
+  add("f-cat",   d.municipalities.map(m=>m.cat));
+  add("f-audit", d.auditOrder.filter(o => d.municipalities.some(m=>m.audit===o)));
+
+  $("f-prov").onchange  = e => { F.prov  = e.target.value; refresh(); };
+  $("f-cat").onchange   = e => { F.cat   = e.target.value; refresh(); };
+  $("f-audit").onchange = e => { F.audit = e.target.value; refresh(); };
+  $("f-search").oninput = e => { F.q     = e.target.value; refresh(); };
+  $("reset").onclick = () => {
+    F.prov=F.audit=F.cat=F.q="";
+    ["f-prov","f-audit","f-cat"].forEach(i=>$(i).value="");
+    $("f-search").value=""; refresh();
+  };
+
+  document.querySelectorAll("#tbl th").forEach(th=>{
+    th.onclick = () => {
+      const k = th.dataset.k;
+      SORT = {k, asc: SORT.k === k ? !SORT.asc : (k === "name")};
+      renderTable(rows());
+    };
+  });
+
+  renderTrend();
+  refresh();
+}).catch(err=>{
+  $("subtitle").textContent = "Could not load dashboard data.";
+  console.error(err);
+});
+</script>
+</body>
+</html>
