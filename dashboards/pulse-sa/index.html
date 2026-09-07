@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Pulse SA — Tech &amp; Business Signal</title>
+<meta name="description" content="South African tech and business news aggregated from ten sources, with near-duplicate stories collapsed and every source's health reported."/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root{
+    --navy:#0d1b2a; --navy-mid:#1a2e45; --card:#152333;
+    --accent:#c8a96e; --white:#f5f7fa; --text:#d0d9e4; --dim:#8a9bae;
+    --border:rgba(200,169,110,0.18);
+    --good:#1baf7a; --bad:#e34948; --warn:#eda100; --blue:#2a78d6;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--navy);color:var(--text);line-height:1.6}
+  a{color:var(--accent)}
+  code,.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+
+  header{padding:1.6rem 2rem 1.2rem;border-bottom:1px solid var(--border);
+         display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end;justify-content:space-between}
+  h1{font-family:'Playfair Display',serif;font-size:1.7rem;color:var(--white);font-weight:700}
+  .sub{font-size:.85rem;color:var(--dim);margin-top:.25rem}
+  .back{font-size:.8rem;text-decoration:none;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+
+  main{padding:1.4rem 2rem 3rem;max-width:1500px;margin:0 auto}
+
+  .strip{display:flex;flex-wrap:wrap;gap:.7rem;margin-bottom:1.2rem}
+  .rate{background:var(--card);border:1px solid var(--border);border-radius:4px;
+        padding:.6rem .9rem;display:flex;gap:.6rem;align-items:baseline}
+  .rate .sym{font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+  .rate .val{font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--accent);font-weight:700}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:1.2rem}
+  .stat{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:.85rem 1.1rem}
+  .stat-num{font-family:'Playfair Display',serif;font-size:1.5rem;color:var(--accent);font-weight:700;line-height:1.2}
+  .stat-lab{font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-top:.25rem}
+
+  .controls{display:flex;flex-wrap:wrap;gap:1.1rem;align-items:flex-end;
+            background:var(--card);border:1px solid var(--border);border-radius:4px;
+            padding:.9rem 1.1rem;margin-bottom:1.2rem}
+  .ctrl{display:flex;flex-direction:column;gap:.3rem}
+  .ctrl label{font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:600}
+  select,input[type=search]{background:var(--navy-mid);color:var(--text);border:1px solid var(--border);
+    border-radius:3px;padding:.42rem .65rem;font-family:'DM Sans',sans-serif;font-size:.84rem;min-width:158px}
+  select:focus,input:focus{outline:1px solid var(--accent)}
+  .reset{background:transparent;border:1px solid var(--border);color:var(--dim);border-radius:20px;
+         padding:.42rem 1rem;font-family:'DM Sans',sans-serif;font-size:.77rem;cursor:pointer}
+  .reset:hover{color:var(--accent);border-color:var(--accent)}
+  .matchline{font-size:.78rem;color:var(--dim);margin-left:auto}
+  .matchline b{color:var(--accent)}
+
+  .grid{display:grid;grid-template-columns:1.55fr 1fr;gap:1.2rem;align-items:start}
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:1.05rem 1.15rem;margin-bottom:1.2rem}
+  .panel h2{font-family:'Playfair Display',serif;font-size:1rem;color:var(--white);margin-bottom:.15rem}
+  .panel .note{font-size:.74rem;color:var(--dim);margin-bottom:.85rem}
+
+  .story{padding:.75rem 0;border-bottom:1px solid rgba(255,255,255,.06)}
+  .story:last-child{border-bottom:none}
+  .story a{color:var(--text);text-decoration:none;font-size:.93rem;line-height:1.45;display:block}
+  .story a:hover{color:var(--accent)}
+  .meta{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin-top:.4rem;font-size:.7rem;color:var(--dim)}
+  .chip{border:1px solid var(--border);border-radius:20px;padding:.05rem .5rem;font-size:.66rem}
+  .chip.multi{background:rgba(200,169,110,.14);border-color:var(--accent);color:var(--accent);font-weight:600}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+  .also{margin-top:.4rem;padding-left:.75rem;border-left:2px solid var(--border);font-size:.76rem;color:var(--dim)}
+  .also a{font-size:.76rem;color:var(--dim)}
+  .also a:hover{color:var(--accent)}
+
+  .terms{display:flex;flex-wrap:wrap;gap:.45rem}
+  .term{border:1px solid var(--border);border-radius:20px;padding:.24rem .7rem;font-size:.78rem;
+        cursor:pointer;transition:.15s;background:transparent;color:var(--text);font-family:'DM Sans',sans-serif}
+  .term:hover,.term.on{border-color:var(--accent);color:var(--accent);background:rgba(200,169,110,.1)}
+  .term small{color:var(--dim);margin-left:.3rem}
+
+  table{width:100%;border-collapse:collapse;font-size:.78rem}
+  th,td{text-align:left;padding:.34rem .3rem;border-bottom:1px solid rgba(255,255,255,.06)}
+  th{font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);font-weight:600}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+
+  .scroll{max-height:560px;overflow-y:auto}
+  footer{padding:1.2rem 2rem 2.5rem;font-size:.77rem;color:var(--dim);max-width:1500px;margin:0 auto}
+  footer a{text-decoration:none}
+
+  @media(max-width:1050px){.grid{grid-template-columns:1fr}}
+  @media(max-width:640px){header,main,footer{padding-left:1rem;padding-right:1rem}.matchline{margin-left:0}}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Pulse SA</h1>
+    <div class="sub" id="subtitle">Loading…</div>
+  </div>
+  <a class="back" href="../../#projects">← Back to portfolio</a>
+</header>
+
+<main>
+  <div class="strip" id="rates"></div>
+  <div class="stats" id="stats"></div>
+
+  <div class="controls">
+    <div class="ctrl"><label for="f-source">Source</label>
+      <select id="f-source"><option value="">All sources</option></select></div>
+    <div class="ctrl"><label for="f-tone">Tone</label>
+      <select id="f-tone">
+        <option value="">Any tone</option>
+        <option value="positive">Positive</option>
+        <option value="neutral">Neutral</option>
+        <option value="negative">Negative</option>
+      </select></div>
+    <div class="ctrl"><label for="f-q">Search headlines</label>
+      <input id="f-q" type="search" placeholder="e.g. Eskom" autocomplete="off"/></div>
+    <button class="reset" id="reset" type="button">Reset</button>
+    <div class="matchline" id="matchline"></div>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="panel">
+        <h2>South African tech &amp; business</h2>
+        <div class="note">Headlines from five publishers, with near-duplicates collapsed into one story. A gold badge means several outlets carried it.</div>
+        <div class="scroll" id="stories"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <h2>Trending terms</h2>
+        <div class="note">Ranked by frequency weighted against how common the word is across the batch, so "africa" does not win every run. Click to filter.</div>
+        <div class="terms" id="terms"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Source health</h2>
+        <div class="note">Every upstream, every run. A failed source degrades its own panel and is reported — it never silently disappears.</div>
+        <table id="health"><thead><tr><th>Source</th><th>Status</th><th class="num">Items</th><th class="num">ms</th></tr></thead><tbody></tbody></table>
+      </div>
+
+      <div class="panel">
+        <h2>Developer ecosystem</h2>
+        <div class="note">Hacker News, GitHub and Stack Overflow, ranked by upstream score.</div>
+        <div class="scroll" style="max-height:320px" id="dev"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  Built by <a href="https://github.com/Siya990808/pulse-sa" target="_blank" rel="noopener">Siyabonga Mfusi</a> ·
+  Sources: TechCentral, BusinessTech, Moneyweb, MyBroadband, Daily Maverick, Hacker News, GitHub, Stack Overflow, Frankfurter, CoinGecko ·
+  Tone is a small word-list heuristic on headlines, not a judgement about the story.
+</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+let DATA;
+const F = { source:"", tone:"", q:"" };
+
+const toneOf = v => v > 0.15 ? "positive" : v < -0.15 ? "negative" : "neutral";
+const TONE_COLOUR = { positive:"#1baf7a", negative:"#e34948", neutral:"#5b6675" };
+
+const ago = iso => {
+  if(!iso) return "";
+  const mins = Math.round((Date.now() - new Date(iso)) / 60000);
+  if(mins < 60) return mins + "m ago";
+  if(mins < 1440) return Math.round(mins/60) + "h ago";
+  return Math.round(mins/1440) + "d ago";
+};
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const num = n => n.toLocaleString("en-ZA");
+
+function visible(){
+  const q = F.q.trim().toLowerCase();
+  return DATA.clusters.filter(c =>
+       (!F.source || c.sources.includes(F.source))
+    && (!F.tone   || toneOf(c.sentiment) === F.tone)
+    && (!q || c.title.toLowerCase().includes(q)
+           || c.stories.some(s => s.title.toLowerCase().includes(q))));
+}
+
+function renderRates(){
+  $("rates").innerHTML = DATA.rates.map(r => {
+    // Explicit grouping: toLocaleString's default locale here can use a comma as
+    // the decimal separator, which turns R15.97 into R15,97.
+    const value = r.value >= 1000
+      ? num(Math.round(r.value))
+      : r.value.toFixed(2);
+    return `<div class="rate"><span class="sym">${esc(r.symbol)}</span>
+            <span class="val">${r.unit}${value}</span></div>`;
+  }).join("") || `<div class="rate"><span class="sym">markets unavailable</span></div>`;
+}
+
+function renderStats(){
+  const s = DATA.stats;
+  const items = [
+    [`${s.sourcesOk}/${s.sourcesTotal}`, "Sources responding"],
+    [num(s.rawItems), "Items pulled"],
+    [num(s.clusters), "Distinct stories"],
+    [num(s.duplicatesCollapsed), "Duplicates collapsed"],
+  ];
+  $("stats").innerHTML = items.map(([v,l]) =>
+    `<div class="stat"><div class="stat-num">${v}</div><div class="stat-lab">${l}</div></div>`).join("");
+}
+
+function renderStories(list){
+  $("stories").innerHTML = list.length ? list.map(c => {
+    const tone = toneOf(c.sentiment);
+    const extras = c.stories.slice(1);
+    return `<div class="story">
+      <a href="${esc(c.stories[0].url)}" target="_blank" rel="noopener">${esc(c.title)}</a>
+      <div class="meta">
+        <span class="dot" style="background:${TONE_COLOUR[tone]}" title="tone: ${tone}"></span>
+        ${c.breadth > 1 ? `<span class="chip multi">${c.breadth} outlets</span>` : ""}
+        ${c.sources.map(s => `<span class="chip">${esc(s)}</span>`).join("")}
+        <span>${ago(c.publishedAt)}</span>
+      </div>
+      ${extras.length ? `<div class="also">${extras.map(s =>
+          `<div><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.source)}: ${esc(s.title)}</a></div>`
+        ).join("")}</div>` : ""}
+    </div>`;
+  }).join("") : `<div class="story" style="color:#8a9bae">No stories match.</div>`;
+
+  $("matchline").innerHTML = `<b>${list.length}</b> of ${DATA.clusters.length} stories shown`;
+}
+
+function renderTerms(){
+  $("terms").innerHTML = DATA.trending.map(t =>
+    `<button class="term ${F.q === t.term ? "on" : ""}" data-term="${esc(t.term)}" type="button">
+       ${esc(t.term)}<small>${t.count}</small></button>`).join("")
+    || `<span style="color:#8a9bae;font-size:.8rem">Not enough headlines this run.</span>`;
+
+  document.querySelectorAll(".term").forEach(btn => {
+    btn.onclick = () => {
+      const term = btn.dataset.term;
+      F.q = F.q === term ? "" : term;
+      $("f-q").value = F.q;
+      refresh();
+    };
+  });
+}
+
+function renderHealth(){
+  $("health").querySelector("tbody").innerHTML = DATA.health.map(h => {
+    const colour = h.ok ? "var(--good)" : h.skipped ? "var(--warn)" : "var(--bad)";
+    const label  = h.ok ? "ok" : h.skipped ? "skipped" : "failed";
+    return `<tr>
+      <td>${esc(h.name)}</td>
+      <td style="color:${colour}" title="${esc(h.error || "")}">${label}</td>
+      <td class="num">${h.items}</td>
+      <td class="num">${h.ms}</td></tr>`;
+  }).join("");
+}
+
+function renderDev(){
+  $("dev").innerHTML = DATA.dev.map(s => `<div class="story">
+      <a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a>
+      <div class="meta"><span class="chip">${esc(s.source)}</span>
+        ${s.score ? `<span>${num(s.score)} points</span>` : ""}
+        <span>${ago(s.publishedAt)}</span></div>
+    </div>`).join("");
+}
+
+function refresh(){
+  renderStories(visible());
+  renderTerms();
+}
+
+fetch("data.json").then(r => r.json()).then(d => {
+  DATA = d;
+
+  const stale = Math.round((Date.now() - new Date(d.generatedAt)) / 3600000);
+  $("subtitle").innerHTML =
+    `${d.stats.sourcesOk} of ${d.stats.sourcesTotal} sources · ${num(d.stats.rawItems)} items · `
+    + `snapshot taken ${ago(d.generatedAt)}`
+    + (stale > 24 ? ` <span style="color:var(--warn)">· data is ${Math.round(stale/24)} days old</span>` : "");
+
+  const sources = [...new Set(d.clusters.flatMap(c => c.sources))].sort();
+  sources.forEach(s => {
+    const o = document.createElement("option"); o.value = s; o.textContent = s;
+    $("f-source").appendChild(o);
+  });
+
+  $("f-source").onchange = e => { F.source = e.target.value; refresh(); };
+  $("f-tone").onchange   = e => { F.tone   = e.target.value; refresh(); };
+  $("f-q").oninput       = e => { F.q      = e.target.value; refresh(); };
+  $("reset").onclick = () => {
+    F.source = F.tone = F.q = "";
+    $("f-source").value = ""; $("f-tone").value = ""; $("f-q").value = "";
+    refresh();
+  };
+
+  renderRates(); renderStats(); renderHealth(); renderDev(); refresh();
+}).catch(err => {
+  $("subtitle").textContent = "Could not load the snapshot.";
+  console.error(err);
+});
+</script>
+</body>
+</html>
