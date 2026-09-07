@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Cape Town Short-Term Rentals — Dashboard</title>
+<meta name="description" content="Interactive dashboard of 27,381 Cape Town Airbnb listings — pricing, ownership concentration and licensing by City of Cape Town ward."/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  :root{
+    --navy:#0d1b2a; --navy-mid:#1a2e45; --card:#152333;
+    --accent:#c8a96e; --white:#f5f7fa; --text:#d0d9e4; --dim:#8a9bae;
+    --border:rgba(200,169,110,0.18);
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--navy);color:var(--text);line-height:1.6}
+  a{color:var(--accent)}
+
+  header{padding:1.6rem 2rem 1.2rem;border-bottom:1px solid var(--border);
+         display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end;justify-content:space-between}
+  h1{font-family:'Playfair Display',serif;font-size:1.7rem;color:var(--white);font-weight:700}
+  .sub{font-size:.85rem;color:var(--dim);margin-top:.25rem}
+  .back{font-size:.8rem;text-decoration:none;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+
+  main{padding:1.6rem 2rem 3rem;max-width:1500px;margin:0 auto}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1rem;margin-bottom:1.4rem}
+  .kpi{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:1rem 1.2rem}
+  .kpi-num{font-family:'Playfair Display',serif;font-size:1.75rem;color:var(--accent);font-weight:700;line-height:1.15}
+  .kpi-lab{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-top:.3rem}
+
+  .controls{display:flex;flex-wrap:wrap;gap:1.4rem;align-items:flex-end;
+            background:var(--card);border:1px solid var(--border);border-radius:4px;
+            padding:1rem 1.2rem;margin-bottom:1.4rem}
+  .ctrl{display:flex;flex-direction:column;gap:.35rem}
+  .ctrl label{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:600}
+  select{background:var(--navy-mid);color:var(--text);border:1px solid var(--border);
+         border-radius:3px;padding:.45rem .7rem;font-family:'DM Sans',sans-serif;font-size:.85rem;min-width:170px}
+  select:focus{outline:1px solid var(--accent)}
+  .reset{background:transparent;border:1px solid var(--border);color:var(--dim);border-radius:20px;
+         padding:.45rem 1rem;font-family:'DM Sans',sans-serif;font-size:.78rem;cursor:pointer;transition:.2s}
+  .reset:hover{color:var(--accent);border-color:var(--accent)}
+  .matchline{font-size:.78rem;color:var(--dim);margin-left:auto}
+  .matchline b{color:var(--accent)}
+
+  .grid{display:grid;grid-template-columns:1.55fr 1fr;gap:1.2rem;align-items:start}
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:1.1rem 1.2rem}
+  .panel h2{font-family:'Playfair Display',serif;font-size:1rem;color:var(--white);margin-bottom:.15rem}
+  .panel .note{font-size:.75rem;color:var(--dim);margin-bottom:.8rem}
+
+  #map{height:520px;border-radius:3px;background:var(--navy-mid)}
+  .leaflet-container{background:var(--navy-mid)}
+  /* OpenStreetMap ships a light basemap; invert it to sit under a dark UI.
+     CartoDB's dark tiles now require an API key, so this is the keyless route. */
+  .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9) saturate(.55)}
+  .leaflet-control-attribution{background:rgba(13,27,42,.82)!important;color:#8a9bae!important;font-size:10px}
+  .leaflet-control-attribution a{color:#c8a96e!important}
+  .leaflet-control-zoom a{background:#152333!important;color:#d0d9e4!important;border-color:rgba(200,169,110,.25)!important}
+  .leaflet-control-zoom a:hover{background:#1a2e45!important;color:#c8a96e!important}
+  .leaflet-tooltip.wardtip{background:#0b1622;border:1px solid var(--border);color:var(--text);
+      font-family:'DM Sans',sans-serif;font-size:.8rem;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .leaflet-tooltip.wardtip::before{display:none}
+  .wardtip b{color:var(--accent)}
+
+  .legend{display:flex;align-items:center;gap:.5rem;margin-top:.7rem;font-size:.72rem;color:var(--dim);flex-wrap:wrap}
+  .swatch{width:26px;height:11px;border-radius:2px;display:inline-block}
+
+  table{width:100%;border-collapse:collapse;font-size:.82rem}
+  th,td{text-align:left;padding:.42rem .3rem;border-bottom:1px solid rgba(255,255,255,.06)}
+  th{font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);font-weight:600}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tbody tr:hover{background:rgba(200,169,110,.07)}
+
+  .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:1.2rem;margin-top:1.2rem}
+  svg{display:block;width:100%;height:auto;overflow:visible}
+  .ax{stroke:rgba(255,255,255,.12);stroke-width:1}
+  .axtext{fill:#8a9bae;font-size:10px;font-family:'DM Sans',sans-serif}
+  .glab{fill:#d0d9e4;font-size:10.5px;font-family:'DM Sans',sans-serif}
+
+  footer{padding:1.4rem 2rem 2.5rem;font-size:.78rem;color:var(--dim);max-width:1500px;margin:0 auto}
+  footer a{text-decoration:none}
+
+  @media(max-width:1050px){.grid{grid-template-columns:1fr}#map{height:420px}}
+  @media(max-width:640px){header,main,footer{padding-left:1rem;padding-right:1rem}.matchline{margin-left:0}}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Cape Town Short-Term Rentals</h1>
+    <div class="sub" id="subtitle">Loading…</div>
+  </div>
+  <a class="back" href="../../#projects">← Back to portfolio</a>
+</header>
+
+<main>
+  <div class="kpis" id="kpis"></div>
+
+  <div class="controls">
+    <div class="ctrl">
+      <label for="f-room">Room type</label>
+      <select id="f-room"><option value="">All room types</option></select>
+    </div>
+    <div class="ctrl">
+      <label for="f-host">Host portfolio</label>
+      <select id="f-host"><option value="">All hosts</option></select>
+    </div>
+    <div class="ctrl">
+      <label for="f-band">Price band</label>
+      <select id="f-band"><option value="">All prices</option></select>
+    </div>
+    <div class="ctrl">
+      <label for="f-metric">Colour the map by</label>
+      <select id="f-metric">
+        <option value="median_price">Median nightly price</option>
+        <option value="listings">Number of listings</option>
+        <option value="pct_commercial">% held by multi-listing hosts</option>
+        <option value="pct_entire">% entire homes</option>
+      </select>
+    </div>
+    <button class="reset" id="reset" type="button">Reset filters</button>
+    <div class="matchline" id="matchline"></div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Where the listings are</h2>
+      <div class="note" id="mapnote">Hover a ward for detail. Inside Airbnb reports Cape Town by City of Cape Town ward, not suburb — the map is how a ward number becomes a place.</div>
+      <div id="map"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Wards by selected metric</h2>
+      <div class="note">Top 12 under the current filters. Wards with fewer than 30 priced listings are excluded from price ranking.</div>
+      <div style="max-height:520px;overflow-y:auto">
+        <table id="wardtable">
+          <thead><tr><th>Ward</th><th class="num">Listings</th><th class="num">Median</th><th class="num">Commercial</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="charts">
+    <div class="panel">
+      <h2>Ownership concentration</h2>
+      <div class="note">Cumulative share of listings held by the largest hosts.</div>
+      <svg id="lorenz" viewBox="0 0 380 250" role="img" aria-label="Ownership concentration curve"></svg>
+    </div>
+    <div class="panel">
+      <h2>Listings by host portfolio</h2>
+      <div class="note">Share of hosts against share of listings.</div>
+      <svg id="profile" viewBox="0 0 380 250" role="img" aria-label="Host portfolio comparison"></svg>
+    </div>
+    <div class="panel">
+      <h2>Forward availability</h2>
+      <div class="note">Nights unavailable — booked and host-blocked combined, so read the shape, not the level.</div>
+      <svg id="avail" viewBox="0 0 380 250" role="img" aria-label="Monthly availability"></svg>
+    </div>
+  </div>
+</main>
+
+<footer>
+  Data: <a href="https://insideairbnb.com/get-the-data/" target="_blank" rel="noopener">Inside Airbnb</a>,
+  Cape Town snapshot, CC BY 4.0 · Analysis and dashboard by
+  <a href="https://github.com/Siya990808/cape-town-rental-market" target="_blank" rel="noopener">Siyabonga Mfusi</a> ·
+  Listed price is advertised, not achieved. Unavailable nights conflate booked with host-blocked.
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// Single-hue sequential ramp (gold), dark -> light for low -> high on a dark surface
+const RAMP = ["#4a3c22","#6d5730","#907342","#b39056","#c8a96e","#e0c893","#f2e0b8"];
+const MUTED = "#2a3646";
+
+const METRICS = {
+  median_price:  {label:"Median nightly price", fmt:v=>"R"+Math.round(v).toLocaleString(), minN:30},
+  listings:      {label:"Number of listings",   fmt:v=>Math.round(v).toLocaleString(),     minN:0},
+  pct_commercial:{label:"% held by multi-listing hosts", fmt:v=>v.toFixed(1)+"%",          minN:30},
+  pct_entire:    {label:"% entire homes",       fmt:v=>v.toFixed(1)+"%",                   minN:30},
+};
+
+let DATA, GEO, layer, map;
+const F = {room:"", host:"", band:""};
+let METRIC = "median_price";
+
+const $ = id => document.getElementById(id);
+
+/* ---------- aggregation ---------- */
+
+const BANDS = [
+  {label:"Under R1,000", lo:0,    hi:1000},
+  {label:"R1,000-2,000", lo:1000, hi:2000},
+  {label:"R2,000-4,000", lo:2000, hi:4000},
+  {label:"R4,000-8,000", lo:4000, hi:8000},
+  {label:"R8,000+",      lo:8000, hi:Infinity},
+];
+
+// Exact median over the listing values themselves. Pre-aggregating and taking a weighted
+// median of group medians lands ~15% low on this distribution, so the payload carries the
+// underlying prices and every filtered figure here is the real one.
+function median(arr){
+  if(!arr.length) return null;
+  const s = Float64Array.from(arr).sort();
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2;
+}
+
+// Row indices surviving the current filters
+function selectRows(){
+  const L = DATA.l, n = L.p.length;
+  const rIdx = F.room ? DATA.dims.rooms.indexOf(F.room) : -1;
+  const hIdx = F.host ? DATA.dims.hosts.indexOf(F.host) : -1;
+  const band = F.band ? BANDS.find(b => b.label === F.band) : null;
+  const out = [];
+  for(let i = 0; i < n; i++){
+    if(rIdx >= 0 && L.r[i] !== rIdx) continue;
+    if(hIdx >= 0 && L.h[i] !== hIdx) continue;
+    if(band && !(L.p[i] >= band.lo && L.p[i] < band.hi)) continue;
+    out.push(i);
+  }
+  return out;
+}
+
+function aggregate(rows){
+  const L = DATA.l;
+  const singleIdx = DATA.dims.hosts.indexOf("Single listing");
+  const entireIdx = DATA.dims.rooms.indexOf("Entire home/apt");
+
+  const buckets = new Map();
+  for(const i of rows){
+    const w = L.w[i];
+    let b = buckets.get(w);
+    if(!b){ b = {prices:[], commercial:0, entire:0}; buckets.set(w, b); }
+    b.prices.push(L.p[i]);
+    if(L.h[i] !== singleIdx) b.commercial++;
+    if(L.r[i] === entireIdx) b.entire++;
+  }
+
+  const out = new Map();
+  for(const [w, b] of buckets){
+    const n = b.prices.length;
+    out.set(DATA.dims.wards[w], {
+      ward: DATA.dims.wards[w],
+      listings: n,
+      median_price: median(b.prices),
+      // Only meaningful while the host filter is off — otherwise it is 0% or 100% by construction
+      pct_commercial: F.host ? null : b.commercial / n * 100,
+      pct_entire: b.entire / n * 100,
+    });
+  }
+  return out;
+}
+
+/* ---------- rendering ---------- */
+
+function colourScale(values){
+  const v = values.filter(x => x != null && !isNaN(x)).sort((a,b)=>a-b);
+  if(!v.length) return () => MUTED;
+  // Quantile breaks: robust to the long tail these distributions all have
+  const breaks = RAMP.map((_,i) => v[Math.min(v.length-1, Math.floor(v.length * i / RAMP.length))]);
+  return x => {
+    if(x == null || isNaN(x)) return MUTED;
+    let idx = 0;
+    for(let i=0;i<breaks.length;i++) if(x >= breaks[i]) idx = i;
+    return RAMP[idx];
+  };
+}
+
+function renderKpis(rows){
+  const L = DATA.l, t = DATA.totals;
+  const singleIdx = DATA.dims.hosts.indexOf("Single listing");
+  const entireIdx = DATA.dims.rooms.indexOf("Entire home/apt");
+
+  const prices = rows.map(i => L.p[i]);
+  const med = median(prices);
+  let commercial = 0, entire = 0;
+  for(const i of rows){
+    if(L.h[i] !== singleIdx) commercial++;
+    if(L.r[i] === entireIdx) entire++;
+  }
+  const n = rows.length;
+
+  const items = [
+    [n.toLocaleString(), "Listings in view"],
+    [med != null ? "R" + Math.round(med).toLocaleString() : "—", "Median nightly price"],
+    [n && !F.host ? (commercial / n * 100).toFixed(1) + "%" : "—", "Held by multi-listing hosts"],
+    [n && !F.room ? (entire / n * 100).toFixed(1) + "%" : "—", "Entire homes"],
+    [t.pct_licensed.toFixed(1) + "%", "Displaying a licence"],
+  ];
+  $("kpis").innerHTML = items.map(([v,l]) =>
+    `<div class="kpi"><div class="kpi-num">${v}</div><div class="kpi-lab">${l}</div></div>`).join("");
+
+  const pct = (n / t.priced * 100).toFixed(0);
+  $("matchline").innerHTML =
+    `<b>${n.toLocaleString()}</b> of ${t.priced.toLocaleString()} priced listings match (${pct}%)`;
+}
+
+function renderMap(agg){
+  if(!layer) return;          // KPIs and the table render before the map is built
+  const m = METRICS[METRIC];
+  const vals = [...agg.values()]
+      .filter(w => w.listings >= m.minN)
+      .map(w => w[METRIC]);
+  const scale = colourScale(vals);
+
+  layer.eachLayer(l => {
+    const w = agg.get(l.feature.properties.ward);
+    const enough = w && w.listings >= m.minN;
+    const val = enough ? w[METRIC] : null;
+    l.setStyle({fillColor: scale(val), fillOpacity: val==null?0.25:0.82,
+                color:"#0d1b2a", weight:1});
+    const rows = w ? `
+        <div>Listings: <b>${w.listings.toLocaleString()}</b></div>
+        <div>Median price: <b>${w.median_price!=null?"R"+Math.round(w.median_price).toLocaleString():"—"}</b></div>
+        <div>Multi-listing hosts: <b>${w.pct_commercial!=null?w.pct_commercial.toFixed(1)+"%":"—"}</b></div>`
+      : `<div>No listings under these filters</div>`;
+    l.bindTooltip(`<div class="wardtip-in"><b>${l.feature.properties.ward}</b>${rows}
+        ${w && !enough ? `<div style="color:#8a9bae;margin-top:.3rem">under 30 listings — not ranked</div>`:""}</div>`,
+        {className:"wardtip", sticky:true});
+  });
+
+  const legendVals = vals.slice().sort((a,b)=>a-b);
+  const lo = legendVals[0], hi = legendVals[legendVals.length-1];
+  $("legend").innerHTML = legendVals.length
+    ? `<span>${m.label}</span><span>${m.fmt(lo)}</span>` +
+      RAMP.map(c=>`<span class="swatch" style="background:${c}"></span>`).join("") +
+      `<span>${m.fmt(hi)}</span><span style="margin-left:.6rem"><span class="swatch" style="background:${MUTED}"></span> too few listings</span>`
+    : `<span>No wards match the current filters</span>`;
+}
+
+function renderTable(agg){
+  const m = METRICS[METRIC];
+  const rows = [...agg.values()]
+    .filter(w => w.listings >= m.minN && w[METRIC] != null)
+    .sort((a,b) => b[METRIC] - a[METRIC])
+    .slice(0,12);
+  $("wardtable").querySelector("tbody").innerHTML = rows.length ? rows.map(w=>`
+      <tr><td>${w.ward}</td>
+      <td class="num">${w.listings.toLocaleString()}</td>
+      <td class="num">${w.median_price!=null?"R"+Math.round(w.median_price).toLocaleString():"—"}</td>
+      <td class="num">${w.pct_commercial!=null?w.pct_commercial.toFixed(0)+"%":"—"}</td></tr>`).join("")
+    : `<tr><td colspan="4" style="color:#8a9bae">No wards match the current filters.</td></tr>`;
+}
+
+/* ---------- static charts ---------- */
+
+function drawLorenz(){
+  const c = DATA.concentration, W=380,H=250, P={l:44,r:12,t:10,b:34};
+  const x = v => P.l + v/100*(W-P.l-P.r);
+  const y = v => H-P.b - v/100*(H-P.t-P.b);
+  const pts = c.cum_hosts.map((h,i)=>`${x(h)},${y(c.cum_listings[i])}`).join(" ");
+  let g = `<line class="ax" x1="${P.l}" y1="${H-P.b}" x2="${W-P.r}" y2="${H-P.b}"/>
+           <line class="ax" x1="${P.l}" y1="${P.t}" x2="${P.l}" y2="${H-P.b}"/>
+           <line x1="${x(0)}" y1="${y(0)}" x2="${x(100)}" y2="${y(100)}" stroke="#3a4757" stroke-dasharray="4 4"/>
+           <polyline points="${pts}" fill="none" stroke="#c8a96e" stroke-width="2.4"/>`;
+  [0,50,100].forEach(v=>{
+    g += `<text class="axtext" x="${x(v)}" y="${H-P.b+14}" text-anchor="middle">${v}%</text>`;
+    g += `<text class="axtext" x="${P.l-6}" y="${y(v)+3}" text-anchor="end">${v}%</text>`;
+  });
+  g += `<text class="axtext" x="${(W)/2}" y="${H-4}" text-anchor="middle">Cumulative hosts, largest first</text>`;
+  $("lorenz").innerHTML = g;
+}
+
+function drawProfile(){
+  const rows = DATA.host_profile, W=380,H=250,P={l:96,r:44,t:8,b:34};
+  const max = Math.max(...rows.map(r=>Math.max(r["% of hosts"], r["% of listings"])));
+  const bw = (H-P.t-P.b)/rows.length;
+  const x = v => P.l + v/max*(W-P.l-P.r);
+  let g = `<line class="ax" x1="${P.l}" y1="${H-P.b}" x2="${W-P.r}" y2="${H-P.b}"/>`;
+  rows.forEach((r,i)=>{
+    const yb = P.t + i*bw;
+    g += `<rect x="${P.l}" y="${yb+3}" width="${x(r["% of listings"])-P.l}" height="${bw/2-4}" fill="#c8a96e"/>
+          <rect x="${P.l}" y="${yb+bw/2+1}" width="${x(r["% of hosts"])-P.l}" height="${bw/2-4}" fill="#2a78d6"/>
+          <text class="glab" x="${P.l-6}" y="${yb+bw/2+2}" text-anchor="end">${r.host_profile}</text>
+          <text class="axtext" x="${x(r["% of listings"])+4}" y="${yb+bw/4+5}">${r["% of listings"].toFixed(1)}%</text>
+          <text class="axtext" x="${x(r["% of hosts"])+4}" y="${yb+3*bw/4+4}">${r["% of hosts"].toFixed(1)}%</text>`;
+  });
+  g += `<rect x="${P.l}" y="${H-16}" width="10" height="9" fill="#c8a96e"/><text class="axtext" x="${P.l+14}" y="${H-8}">% of listings</text>
+        <rect x="${P.l+92}" y="${H-16}" width="10" height="9" fill="#2a78d6"/><text class="axtext" x="${P.l+106}" y="${H-8}">% of hosts</text>`;
+  $("profile").innerHTML = g;
+}
+
+function drawAvail(){
+  const a = DATA.availability, W=380,H=250,P={l:38,r:12,t:12,b:46};
+  const lo = Math.min(...a.map(d=>d.unavailable_pct))-3, hi = Math.max(...a.map(d=>d.unavailable_pct))+3;
+  const x = i => P.l + i/(a.length-1)*(W-P.l-P.r);
+  const y = v => H-P.b - (v-lo)/(hi-lo)*(H-P.t-P.b);
+  let g = `<line class="ax" x1="${P.l}" y1="${H-P.b}" x2="${W-P.r}" y2="${H-P.b}"/>
+           <line class="ax" x1="${P.l}" y1="${P.t}" x2="${P.l}" y2="${H-P.b}"/>
+           <polyline points="${a.map((d,i)=>`${x(i)},${y(d.unavailable_pct)}`).join(" ")}"
+                     fill="none" stroke="#c8a96e" stroke-width="2.4"/>`;
+  a.forEach((d,i)=>{
+    g += `<circle cx="${x(i)}" cy="${y(d.unavailable_pct)}" r="3" fill="#c8a96e"><title>${d.month}: ${d.unavailable_pct}%</title></circle>`;
+    if(i % 3 === 0) g += `<text class="axtext" x="${x(i)}" y="${H-P.b+15}" text-anchor="end" transform="rotate(-45 ${x(i)} ${H-P.b+15})">${d.month}</text>`;
+  });
+  [Math.ceil(lo/5)*5, Math.floor(hi/5)*5].forEach(v=>{
+    g += `<text class="axtext" x="${P.l-5}" y="${y(v)+3}" text-anchor="end">${v}%</text>`;
+  });
+  $("avail").innerHTML = g;
+}
+
+/* ---------- map construction ---------- */
+
+// Build the map only once its container has its final laid-out size. Creating it earlier
+// and patching with invalidateSize leaves the tile and vector layers out of sync — tiles
+// stay at the pre-fit zoom while the polygons move. preferCanvas avoids a separate SVG
+// sizing bug and is cheaper for 85 polygons.
+function buildMap(){
+  requestAnimationFrame(() => {
+    const el = $("map");
+    if(!el.clientWidth){ requestAnimationFrame(buildMap); return; }
+
+    map = L.map(el, {scrollWheelZoom:false, preferCanvas:true});
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 16,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
+    }).addTo(map);
+
+    layer = L.geoJSON(GEO, {style:{color:"#0d1b2a", weight:1, fillOpacity:.8}}).addTo(map);
+    map.fitBounds(layer.getBounds(), {padding:[10,10]});
+
+    // The grid collapses to one column at 1050px; Leaflet caches container size, so it
+    // needs telling. Invalidate only — refitting here would re-trigger the observer.
+    if(window.ResizeObserver){
+      let first = true;
+      new ResizeObserver(() => {
+        if(first){ first = false; return; }
+        map.invalidateSize({animate:false});
+      }).observe(el);
+    }
+
+    refresh();
+  });
+}
+
+/* ---------- wiring ---------- */
+
+function refresh(){
+  const rows = selectRows();
+  const agg = aggregate(rows);
+  renderKpis(rows); renderMap(agg); renderTable(agg);
+}
+
+function fillSelect(id, values, key){
+  const el = $(id);
+  [...new Set(values)].filter(Boolean).forEach(v=>{
+    const o = document.createElement("option"); o.value = v; o.textContent = v; el.appendChild(o);
+  });
+  el.addEventListener("change", () => { F[key] = el.value; refresh(); });
+}
+
+Promise.all([
+  fetch("data.json").then(r=>r.json()),
+  fetch("wards.geojson").then(r=>r.json()),
+]).then(([d, g])=>{
+  DATA = d; GEO = g;
+  $("subtitle").textContent =
+    `${d.totals.priced.toLocaleString()} priced listings of ${d.totals.listings.toLocaleString()} · `
+    + `${d.totals.hosts.toLocaleString()} hosts · Inside Airbnb snapshot, ${d.snapshot}`;
+
+  buildMap();
+
+  fillSelect("f-room", d.dims.rooms, "room");
+  fillSelect("f-host", d.dims.hosts, "host");
+  fillSelect("f-band", BANDS.map(b => b.label), "band");
+
+  $("f-metric").addEventListener("change", e => { METRIC = e.target.value; refresh(); });
+  $("reset").addEventListener("click", ()=>{
+    F.room=F.host=F.band=""; ["f-room","f-host","f-band"].forEach(i=>$(i).value="");
+    refresh();
+  });
+
+  drawLorenz(); drawProfile(); drawAvail();
+  refresh();
+}).catch(err=>{
+  $("subtitle").textContent = "Could not load dashboard data.";
+  console.error(err);
+});
+</script>
+</body>
+</html>
